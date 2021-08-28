@@ -9,7 +9,7 @@ warn () {
 }
 
 error () {
-  echo -e "\e[31mERROR>\e0 $1"
+  echo -e "\e[31mERROR>\e[0 $1"
 }
 
 yes_no () {
@@ -18,6 +18,20 @@ yes_no () {
     return 1
   fi
   return 0
+}
+
+generate_session () {
+  info "Creating CD session..."
+  mkisofs -M $1 -C "$(cdrecord dev=$1 -msinfo)" -V "YT2CD" -J -r -o session.iso ./music  
+}
+
+write_session () {
+  info "Beginning cdrecord..."
+  cdrecord -v -multi dev=$1 session.iso
+  if [ $? -ne 0 ]; then
+    error "cdrecord exited with non-zero exit code"
+    exit 4
+  fi
 }
 
 util_check=0
@@ -52,15 +66,9 @@ youtube-dl --download-archive downloaded.txt -xiq --audio-format mp3 "$url" -o "
 info "Began video downloading"
 
 cd_path="/dev/sr0"
-echo "Path to CD drive [default $cd_path]:"
-read cd_path_tmp
+read -r -p "Path to CD drive [default $cd_path]:" cd_path_tmp
 if [ ! $cd_path_tmp = "" ]; then
   cd_path=cd_path_tmp
-fi
-
-if [ ! -f "$cd_path" ]; then
-  error "Path $cd_path not found."
-  exit 3
 fi
 
 info "Waiting for youtube-dl..."
@@ -70,12 +78,6 @@ if [ $? -eq 1 ]; then
   exit 2
 fi
 
-# TODO allow renaming the volume here instead of just YT2CD
-info "Creating CD session..."
-mkisofs -M $cd_path -C "$(cdrecord dev=$cd_path -msinfo)" -V "YT2CD" -J -r -o session.iso ./music
-info "Beginning cdrecord..."
-cdrecord -v -multi dev=$cd_path session.iso
-if [ $? -ne 0 ]; then
-  error "cdrecord exited with non-zero exit code"
-  exit 4
-fi
+generate_session $cd_path
+write_session $cd_path
+
