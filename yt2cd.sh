@@ -23,15 +23,13 @@ yes_no () {
 generate_session () {
   info "Creating CD session..."
   mkisofs -M $1 -C "$(cdrecord dev=$1 -msinfo)" -V "YT2CD" -J -r -o session.iso ./music  
+  return $?
 }
 
 write_session () {
   info "Beginning cdrecord..."
   cdrecord -v -multi dev=$1 session.iso
-  if [ $? -ne 0 ]; then
-    error "cdrecord exited with non-zero exit code"
-    exit 4
-  fi
+  return $?
 }
 
 util_check=0
@@ -48,8 +46,7 @@ if [ $util_check -ne 0 ]; then
   exit 1
 fi
 
-echo "Youtube playlist URL:"
-read url
+read -r -p  "Youtube playlist URL:" url
 
 if [ -d "./yt2cd_data" ]; then
   yes_no "A data folder for yt2cd already exists. Do you want to delete it?"
@@ -61,6 +58,24 @@ fi
 
 mkdir -p yt2cd_data/music
 cd yt2cd_data
+
+if [ -f "session.iso" ]; then 
+  yes_no "A previous session exists. Would you like to try writing it to the disc?"
+  if [ $? -eq 1 ]; then
+    write_session
+    exit 0
+  else 
+    yes_no "Would you like to delete it?"
+    if [ $? -eq 1 ]; then
+      info "Previous sesson deleted."
+      rm session.iso
+    else
+      info "Exiting..."
+      exit 0
+    fi
+  fi
+fi
+
 #start the videos downloading
 youtube-dl --download-archive downloaded.txt -xiq --audio-format mp3 "$url" -o "music/%(title)s.%(ext)s" &
 info "Began video downloading"
@@ -79,5 +94,13 @@ if [ $? -eq 1 ]; then
 fi
 
 generate_session $cd_path
-write_session $cd_path
+if [ $? -ne 0 ]; then
+  error "mkisofs returned with non-zero exit code $?"
+  exit 3
+fi
 
+write_session $cd_path
+if [ $? -ne 0 ]; then
+  error "cdrecord returned with non-zero exit code $?"
+  exit 4
+fi
