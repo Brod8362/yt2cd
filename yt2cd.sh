@@ -22,7 +22,12 @@ yes_no () {
 
 generate_session () {
   info "Creating CD session..."
-  mkisofs -M $1 -C "$(cdrecord dev=$1 -msinfo)" -V "YT2CD" -J -r -o session.iso ./music  
+  sessinfo=$(cdrecord dev=$1 -msinfo)
+  if [ $? -ne 0 ]; then
+    mkisofs -M $1 -C $sessinfo -V "YT2CD" -J -r -o session.iso ./music  
+  else
+    mkisofs -M $1 -V "YT2CD" -J -r -o session.iso ./music  
+  fi
   return $?
 }
 
@@ -89,18 +94,18 @@ fi
 info "Waiting for youtube-dl..."
 wait
 if [ $? -eq 1 ]; then
-  error "youtube-dl returned with non-zero exit code $?"
+  error "youtube-dl returned with non-zero exit code"
   exit 2
 fi
 
 generate_session $cd_path
 if [ $? -ne 0 ]; then
-  error "mkisofs returned with non-zero exit code $?"
+  error "mkisofs returned with non-zero exit code"
   exit 3
 fi
 
 write_session $cd_path
 if [ $? -ne 0 ]; then
-  error "cdrecord returned with non-zero exit code $?"
+  error "cdrecord returned with non-zero exit code"
   exit 4
 fi
